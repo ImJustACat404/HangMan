@@ -74,16 +74,17 @@ DATASEG
 				 db 72 dup (64h) ;64h = blue
 	
 	;number of pixels you need to print to get each stage of the Hangman picture (29- first 29 pixels, 70- first 70 pixels...)
-	Pixels dw 29, 70, 96, 134, 143, 150, 157, 163, 169
+	Pixels dw 29, 70, 96, 134, 143, 150, 157, 163, 169 
 	
 	;=========================
 	;Text (messages, story...)
 	;=========================
 	
-	Hangman db "                Hangman!", 10, 13,  "$"
+	Hangman db "                Hangman!", 10, 13
+			db "              By Ido Senn",10,13,"$"
 	PressStart db "        Press any key to start!", 10, 13,  "$"
 	theWord db "The word:", 10, 13, '$'
-	enterDifficulty db "Please enter word length (number between 4 and 6):", 10, 13, "$"
+	enterDifficulty db "Please enter word length (number between4 and 6):", 10, 13, "$"
 	wrongInput db 10, 13,"Whoops! Thats not a valid input!", 10, 13, "$"
 	gussedLettersMessage db 10,13,10,13,"Letters you guessed:",10,13,"$"
 	gusseLetterMessage db 10,13,10,13,"Please enter (small) letter you wish to guess:",10,13,"$"
@@ -120,6 +121,210 @@ CODESEG
 ; --------------------------
 ; Your procedures here
 ; --------------------------
+	proc ColorScreen ;Color the entire screen
+		push bp
+		mov bp, sp
+		push ax
+		push bx
+		push cx
+		push dx
+		ScreenColor equ [bp+4]
+		push 320
+		push 200
+		push 0
+		push 0
+		push ScreenColor
+		call PrintMalben
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 2
+	endp ColorScreen
+	
+	proc PrintPixel ;in claim: x (dw),y (dw),color(db)
+		push bp
+		mov bp, sp
+		push ax
+		push bx
+		push cx
+		push dx
+		X equ [word ptr bp+8]
+		Y equ [word ptr bp+6]
+		color equ [bp+4]
+		; Print pixel
+		mov bh,0h ;book says bl needs to be 0. maybe they ment bh?
+		mov cx,	X ;cx the X cords
+		mov dx, Y ;dx the Y cords
+		mov al,	color ;al contains the color
+		mov ah,	0ch ;bios  inturrupt
+		int 10h
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 6
+	endp PrintPixel
+	
+	proc PrintVerticalLine
+		push bp
+		mov bp, sp
+		push ax
+		push bx
+		push cx
+		push dx
+		LineLength equ [word ptr bp+10]
+		X equ [word ptr bp+8]
+		Y equ [word ptr bp+6]
+		Color equ [bp+4]
+		mov cx, LineLength
+			DotPrint:
+				push X
+				push Y
+				push Color
+				call PrintPixel
+				inc Y
+			loop DotPrint
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 8
+	endp PrintVerticalLine
+	
+	proc PrintMalben
+		;Print a malben. In claim: HorizontalLength, VerticalLength, X and Y of top left corner, color.
+		push bp
+		mov bp, sp
+		push ax
+		push bx
+		push cx
+		push dx
+		HorizontalLength equ [word ptr bp+12]
+		VerticalLength equ [word ptr bp+10]
+		X equ [word ptr bp+8]
+		Y equ [word ptr bp+6]
+		Color equ [bp+4]
+		mov cx, HorizontalLength
+			LinePrint:
+				push VerticalLength
+				push X
+				push Y
+				push Color
+				call PrintVerticalLine
+				inc X
+			loop LinePrint
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 10
+	endp PrintMalben
+	
+	proc WaitTicks
+	;Wait [TicksToWait] Ticks. Tick is 55 miliseconds.
+		push bp
+		mov bp, sp
+		TicksToWait equ [bp+4]
+		push ax
+		push bx
+		push cx
+		push dx
+		mov cx, TicksToWait
+			WaitTick:
+				mov ax, 40h
+				mov es, ax
+				mov bl, [es:6Ch]
+					CheckForChange:
+						cmp bl, [es:6Ch]
+					je CheckForChange
+			loop WaitTick
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 2
+	endp WaitTicks
+
+	proc PlayBeep
+		push bp
+		mov bp, sp
+		timeToBeep equ [bp+6]
+		frequency equ [bp+4]
+		push ax
+		push bx
+		push cx
+		push dx
+		; open speaker
+		in al, 61h
+		or al, 00000011b
+		out 61h, al
+		; send control word to change frequency
+		mov al, 0B6h
+		out 43h, al
+		; play frequency 131Hz
+		mov ax, frequency
+		out 42h, al ; Sending lower byte
+		mov al, ah
+		out 42h, al ; Sending upper byte
+		;wait
+		mov dx, timeToBeep
+		push dx
+		call WaitTicks
+		; close the speaker
+		in al, 61h
+		and al, 11111100b
+		out 61h, al
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 4
+	endp PlayBeep
+
+	proc PlayBoom
+		push ax
+		push bx
+		push cx
+		push dx
+		mov dx, 0
+		mov cx, 0FFFFh
+			BoomLoop:
+				; open speaker
+				in al, 61h
+				or al, 00000011b
+				out 61h, al
+				; send control word to change frequency
+				mov al, 0B6h
+				out 43h, al
+				; play frequency 131Hz
+				mov ax, dx
+				out 42h, al ; Sending lower byte
+				mov al, ah
+				out 42h, al ; Sending upper byte
+				; close the speaker
+				in al, 61h
+				and al, 11111100b
+				out 61h, al
+				;increce frec
+				inc dx
+			loop BoomLoop
+		; close the speaker
+		in al, 61h
+		and al, 11111100b
+		out 61h, al
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		ret
+	endp PlayBoom
 	
 	proc SetAllLetterStatusesToTrue
 	;Sets all the valus of letterStatus array to 1 (true).
@@ -247,6 +452,7 @@ CODESEG
 		ret 2
 	endp ManuallyDrawMan
 	
+	
 	proc DrawMan
 	;Draw the Hangman picture acording to wrong guesses ([wrongGusses]=3 => Draws hangman 3/9)
 		push ax
@@ -302,6 +508,25 @@ EndDrawingMan:
 		jmp LetterIsNotInWord
 LetterIsInWord:
 		dec [wrongGusses]
+		;Play sound
+		push 2 ;Ticks to beep
+		push 9000 ;Frequency to beep
+		call PlayBeep
+		push 2 ;Ticks to beep
+		push 6000 ;Frequency to beep
+		call PlayBeep
+		push 2 ;Ticks to beep
+		push 3000 ;Frequency to beep
+		call PlayBeep
+		push 2 ;Ticks to beep
+		push 1000 ;Frequency to beep
+		call PlayBeep
+		push 4 ;Ticks to beep
+		push 500 ;Frequency to beep
+		call PlayBeep
+		push 3 ;Ticks to beep
+		push 9000 ;Frequency to beep
+		call PlayBeep
 LetterIsNotInWord:
 		pop dx
 		pop cx
@@ -435,12 +660,19 @@ LetterIsNotInWord:
 	proc ClearScreen
 	;clears the screen by switching between text and graphic mode.
 		push ax
-		;switch to text mode
-		mov ax, 2
-		int 10h
-		;switch to graphic mode
-		mov ax, 13h
-		int 10h
+		push bx 
+		push cx
+		push dx
+		push 0
+		call ColorScreen
+		mov  dl, 0   ;Column ---till 39
+		mov  dh, 1   ;Row ---till 24
+		mov  bh, 0    ;Display page
+		mov  ah, 02h  ;SetCursorPosition
+		int  10h
+		pop dx
+		pop cx
+		pop bx
 		pop ax
 		ret
 	endp ClearScreen
@@ -477,14 +709,12 @@ start:
 	;======================================================
 	;Print title screen (waits one second for each drawing)
 	;======================================================
-	;======================================================
-	;Print title screen (waits one second for each drawing)
-	;======================================================
 	mov di, 0 ;counter
 	mov cx, 9 ;9 frames
 		PrintTitle:
 			push di
-			call WaitSecond
+			push 8
+			call WaitTicks
 			push [pixels+di]
 			call ManuallyDrawMan
 			pop di
@@ -505,6 +735,8 @@ start:
 	mov ah, 0ch
 	int 21h
 	call WaitKey
+	;Play input sound
+	call PlayBoom
 	;==========================================
 	;print story and wait for input to continue
 	;==========================================
@@ -514,6 +746,7 @@ start:
 	int 21h
 	call WaitKey
 	call ClearScreen
+	
 ;===========
 ;game starts
 ;===========
@@ -540,6 +773,10 @@ InvalidInput:
 	mov dx, offset wrongInput	;print message about invalid input.
 	mov ah, 9
 	int 21h
+	;Play beep sound
+	push 3
+	push 15000
+	call PlayBeep
 skipInvalidInputMessage:
 	mov dx, offset enterDifficulty	;print message about difficulty input (4-6)
 	mov ah, 9
@@ -621,6 +858,10 @@ NotLetter:
 	mov dx, offset wrongInput;print message about invalid input.
 	mov ah, 9
 	int 21h
+	;Play beep sound
+	push 3
+	push 15000
+	call PlayBeep
 skipNotLetterMessage:
 	mov dx, offset gusseLetterMessage;print message about small letter input.
 	mov ah, 9
@@ -637,10 +878,6 @@ skipNotLetterMessage:
 	jb NotLetter
 	cmp al, 7Ah
 	ja NotLetter
-	;============
-	;clear screen
-	;============
-	call ClearScreen
 	;================================
 	;change letter status to 1 (true)
 	;================================
@@ -654,7 +891,11 @@ skipNotLetterMessage:
 	;=======================================
 	xor ah, ah
 	push ax
-	call ChackIfWrong
+	call ChackIfWrong ;Beeps if wrong
+	;============
+	;clear screen
+	;============
+	call ClearScreen
 ;==================
 ;Chack if user lose
 ;==================
@@ -710,12 +951,20 @@ GameEnd:
 	int 21h
 	call SetAllLetterStatusesToTrue
 	call WordPrint
+	;====================
+	;play game over sound
+	;====================
+	call PlayBoom
 	;===================================
 	;Ask user if they want to play again
 	;===================================
 	mov ah, 9
 	mov dx, offset playAgain
 	int 21h
+	;clear buffer
+	mov ah, 0ch
+	int 21h
+	;get letter from the user
 	mov ah, 1
 	int 21h
 	cmp al, 'y'
