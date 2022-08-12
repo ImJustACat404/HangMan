@@ -74,15 +74,7 @@ DATASEG
 				 db 72 dup (64h) ;64h = blue
 	
 	;number of pixels you need to print to get each stage of the Hangman picture (29- first 29 pixels, 70- first 70 pixels...)
-	pixel1 dw (29) ;draws hangman 1/9
-	pixel2 dw (70) ;draws hangman 2/9
-	pixel3 dw (96) ;draws hangman 3/9
-	pixel4 dw (134) ;draws hangman 4/9
-	pixel5 dw (143) ;draws hangman 5/9
-	pixel6 dw (150) ;draws hangman 6/9
-	pixel7 dw (157) ;draws hangman 7/9
-	pixel8 dw (163) ;draws hangman 8/9
-	pixel9 dw (169) ;draws hangman 9/9
+	Pixels dw 29, 70, 96, 134, 143, 150, 157, 163, 169
 	
 	;=========================
 	;Text (messages, story...)
@@ -265,64 +257,17 @@ CODESEG
 		push offset hangmanY
 		push offset hangmanColor
 		cmp [wrongGusses], 0
-		je NoWrong
-		cmp [wrongGusses], 1
-		je OneWrong
-		cmp [wrongGusses], 2
-		je TwoWrong
-		cmp [wrongGusses], 3
-		je ThreeWrong
-		cmp [wrongGusses], 4
-		je FourWrong
-		cmp [wrongGusses], 5
-		je FiveWrong
-		cmp [wrongGusses], 6
-		je SixWrong
-		cmp [wrongGusses], 7
-		je SevenWrong
-		cmp [wrongGusses], 8
-		je EightWrong
-		cmp [wrongGusses], 9
-		je NineWrong
-NoWrong:
-		pop cx ;balance stack
-		pop cx
-		pop cx
+		jne NotZero
+		pop ax
+		pop ax
+		pop ax 
 		jmp EndDrawingMan
-OneWrong:
-		push [pixel1]
-		call PrintPnoClear
-		jmp EndDrawingMan
-TwoWrong:
-		push [pixel2]
-		call PrintPnoClear
-		jmp EndDrawingMan
-ThreeWrong:
-		push [pixel3]
-		call PrintPnoClear
-		jmp EndDrawingMan
-FourWrong:
-		push [pixel4]
-		call PrintPnoClear
-		jmp EndDrawingMan
-FiveWrong:
-		push [pixel5]
-		call PrintPnoClear
-		jmp EndDrawingMan
-SixWrong:
-		push [pixel6]
-		call PrintPnoClear
-		jmp EndDrawingMan
-SevenWrong:
-		push [pixel7]
-		call PrintPnoClear
-		jmp EndDrawingMan
-EightWrong:
-		push [pixel8]
-		call PrintPnoClear
-		jmp EndDrawingMan
-NineWrong:
-		push [pixel9]
+		NotZero:
+		xor bx, bx
+		mov bl, [wrongGusses]
+		add bx, bx
+		sub bx, 2
+		push [pixels +bx]
 		call PrintPnoClear
 EndDrawingMan:
 		pop dx
@@ -532,34 +477,19 @@ start:
 	;======================================================
 	;Print title screen (waits one second for each drawing)
 	;======================================================
-	call WaitSecond
-	push [pixel1]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel2]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel3]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel4]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel5]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel6]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel7]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel8]
-	call ManuallyDrawMan
-	call WaitSecond
-	push [pixel9]
-	call ManuallyDrawMan
-	call WaitSecond
+	;======================================================
+	;Print title screen (waits one second for each drawing)
+	;======================================================
+	mov di, 0 ;counter
+	mov cx, 9 ;9 frames
+		PrintTitle:
+			push di
+			call WaitSecond
+			push [pixels+di]
+			call ManuallyDrawMan
+			pop di
+			add di, 2
+		loop PrintTitle
 	;============
 	; Print title
 	;============
@@ -571,6 +501,9 @@ start:
 	;===============================
 	;wait for user input to continue
 	;===============================
+	;clear buffer so the game won't count button presses during animation
+	mov ah, 0ch
+	int 21h
 	call WaitKey
 	;==========================================
 	;print story and wait for input to continue
@@ -581,8 +514,6 @@ start:
 	int 21h
 	call WaitKey
 	call ClearScreen
-	
-	
 ;===========
 ;game starts
 ;===========
